@@ -1,0 +1,7 @@
+data/
+.idea/
+ner_env/
+src/__pycache__/
+src/predicted_entities.json
+src/foodner.log
+	
