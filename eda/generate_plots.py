@@ -130,7 +130,7 @@ def plot_food_entities_quantities(quantities, num_of_files, num_of_categories, i
     for i, v in enumerate(quantities.values()):
         ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
 
-    plt.title(f"Entities quantities within {num_of_files} recipes", size=20)
+    plt.title(f"Food entities quantities within {num_of_files} recipes", size=20)
     plt.tight_layout()
 
     if save_fig:
