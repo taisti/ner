@@ -16,6 +16,11 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
+To freely import all scripts, please add the followings to the PYTHONPATH:
+```bash
+export PYTHONPATH=$PYTHONPATH:<path-to-ner-repo-folder>/src
+```
+
 In order to download models (currently, only FoodNer) use git-lfs:
 ```bash
 git lfs pull origin data-preparation-and-foodner
@@ -41,10 +46,22 @@ python src/FoodNer.py \
 --recipes-folder ./data/annotations
 ```
 
+See ./eda/generate_plots.py for more details.
+
 FoodNer's paper: [A Fine-Tuned Bidirectional Encoder Representations From Transformers
 Model for Food Named-Entity Recognition: Algorithm Development and
 Validation](https://www.researchgate.net/publication/353789336_A_Fine-Tuned_Bidirectional_Encoder_Representations_From_Transformers_Model_for_Food_Named-Entity_Recognition_Algorithm_Development_and_Validation)
 
+
+You can also generate some plots, for instance, with the following command:
+```bash
+python eda/generate_plots.py \
+-af ./data/annotations \
+-if ./eda/images \
+-noc 20 \
+--show-fig True \
+--save-fig True
+```
 
 Ideas for NER models:
 * classicaly, HuggingFace and `BertForTokenClassification`
