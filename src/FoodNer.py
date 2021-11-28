@@ -98,14 +98,20 @@ if __name__ == "__main__":
         "taste": "O",
         "process": "O",
         "example": "O",
-        "part": "O"
+        "part": "O",
+        "diet": "O",
+        "possible_substitute": "O",
+        "excluded": "O",
+        "exclusive": "O"
     }
 
     recipes, entities = prepare_data_utils.collect_annotations(
         annotations_folder=args.annotations_folder, recipes_folder=args.recipes_folder,
         scheme_func=prepare_data_utils.bio_scheme,
         map_entity_func=prepare_data_utils.map_entity,
-        entities_map=ENTITIES_MAP)
+        entities_map=ENTITIES_MAP,
+        choose_span_func=prepare_data_utils.choose_food_span
+    )
 
     # see foodner.log
     entities_predicted = foodner.predict(recipes, entities)
