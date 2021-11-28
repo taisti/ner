@@ -136,7 +136,7 @@ def plot_entities_examples_quantities(quantities, num_of_files, num_of_categorie
     plt.tight_layout()
 
     if save_fig:
-        fig_path = os.path.join(images_folder_path, "{entity_type}_examples_distribution.png")
+        fig_path = os.path.join(images_folder_path, f"{entity_type}_examples_distribution.png")
         plt.savefig(fig_path)
 
     if show_fig:
@@ -171,7 +171,7 @@ def main(args):
             quantities_with_numeric["numeric"] += v
         else:
             quantities_with_numeric[k] = v
-            
+
     plot_entities_examples_quantities(quantities_with_numeric, num_of_files, args.num_of_categories, "quantity",
                                       args.images_folder, args.save_fig, args.show_fig)
 
