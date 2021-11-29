@@ -1,4 +1,5 @@
 import os
+import re
 import argparse
 
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ import spacy
 from src.prepare_data_utils import process_ann_file
 
 
-def count_entities_types(quantities_dict, entities, nlp):
+def count_entities_types(quantities_dict, entities, nlp, entity_type):
 
     for entity in entities.values():
         if entity.type in quantities_dict.keys():
@@ -19,15 +20,16 @@ def count_entities_types(quantities_dict, entities, nlp):
     return quantities_dict
 
 
-def count_food_entities(quantities_dict, entities, nlp):#TODO kwargs for nlp argument or default none
+# TODO kwargs for nlp argument or default none
+def count_entities_examples(quantities_dict, entities, nlp, entity_type):
 
     for entity in entities.values():
-        if "food" in entity.type:
-            #print(entity.text) #TODO print text: ...
+        if entity.type.startswith(entity_type):
+            # print(entity.text)  #TODO print text: ...
 
             doc = nlp(entity.text)
             entity_lemmas = " ".join([token.lemma_ for token in doc])
-            #print(entity_lemmas)
+            # print(entity_lemmas)
 
             if entity_lemmas in quantities_dict.keys():
                 quantities_dict[entity_lemmas] += 1
@@ -37,7 +39,7 @@ def count_food_entities(quantities_dict, entities, nlp):#TODO kwargs for nlp arg
     return quantities_dict
 
 
-def calculate_quantities(path_to_annotations_folder, count_func, nlp):
+def calculate_quantities(path_to_annotations_folder, count_func, nlp, entity_type):
 
     quantities = {}
 
@@ -52,7 +54,7 @@ def calculate_quantities(path_to_annotations_folder, count_func, nlp):
         path_to_ann_file = os.path.join(path_to_annotations_folder, ann_file)
         entities, relations = process_ann_file(path_to_ann_file)
 
-        quantities = count_func(quantities, entities, nlp)
+        quantities = count_func(quantities, entities, nlp, entity_type)
 
     return quantities, num_of_files
 
@@ -108,7 +110,8 @@ def plot_entities_quantities(quantities, num_of_files, num_of_categories, images
         plt.show()
 
 
-def plot_food_entities_quantities(quantities, num_of_files, num_of_categories, images_folder_path, save_fig, show_fig):
+def plot_entities_examples_quantities(quantities, num_of_files, num_of_categories, entity_type, images_folder_path,
+                                      save_fig, show_fig):
 
     quantities = dict(sorted(quantities.items(), key=lambda x: x[1],
                              reverse=True))
@@ -137,11 +140,11 @@ def plot_food_entities_quantities(quantities, num_of_files, num_of_categories, i
     for i, v in enumerate(quantities.values()):
         ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
 
-    plt.title(f"Food entities quantities within {num_of_files} recipes", size=20)
+    plt.title(f"{entity_type} entities quantities within {num_of_files} recipes", size=20)
     plt.tight_layout()
 
     if save_fig:
-        fig_path = os.path.join(images_folder_path, "entities_types_distribution.png")
+        fig_path = os.path.join(images_folder_path, "{entity_type}_examples_distribution.png")
         plt.savefig(fig_path)
 
     if show_fig:
@@ -155,15 +158,32 @@ def main(args):
 
     nlp = spacy.load("en_core_web_sm")
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_types, nlp)
+    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_types, nlp, None)
 
     plot_entities_quantities(quantities, num_of_files, args.num_of_categories, args.images_folder, args.save_fig,
                              args.show_fig)
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_food_entities, nlp)
+    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "food")
 
-    plot_food_entities_quantities(quantities, num_of_files, args.num_of_categories, args.images_folder, args.save_fig,
-                                  args.show_fig)
+    plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, "food", args.images_folder,
+                                      args.save_fig, args.show_fig)
+
+    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "unit")
+
+    plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, "unit", args.images_folder,
+                                      args.save_fig, args.show_fig)
+
+    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "quantity")
+
+    quantities_with_numeric = {"numeric": 0}
+    for k, v in quantities.items():
+        if bool(re.search(r'([0-9]+.[1-9][0-9]|[0-9]+)', k)):
+            quantities_with_numeric["numeric"] += v
+        else:
+            quantities_with_numeric[k] = v
+
+    plot_entities_examples_quantities(quantities_with_numeric, num_of_files, args.num_of_categories, "quantity",
+                                      args.images_folder, args.save_fig, args.show_fig)
 
 
 if __name__ == "__main__":
