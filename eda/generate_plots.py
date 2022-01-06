@@ -100,6 +100,7 @@ def plot_entities_quantities(quantities, num_of_files, num_of_categories, images
         ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
 
     plt.title(f"Entities quantities within {num_of_files} recipes", size=20)
+    plt.ylim(0, 1.2 * max(quantities.values()))
     plt.tight_layout()
 
     if save_fig:
@@ -141,6 +142,7 @@ def plot_entities_examples_quantities(quantities, num_of_files, num_of_categorie
         ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
 
     plt.title(f"{entity_type} entities quantities within {num_of_files} recipes", size=20)
+    plt.ylim(0, 1.2 * max(quantities.values()))
     plt.tight_layout()
 
     if save_fig:
