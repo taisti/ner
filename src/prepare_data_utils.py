@@ -1,5 +1,6 @@
 import spacy
 import os
+import re
 import copy
 import string
 import warnings
@@ -188,12 +189,11 @@ def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_fun
     return recipe_tokens, recipe_entities
 
 
-def collect_annotations(annotations_folder, recipes_folder, scheme_func, map_entity_func, entities_map,
-                        choose_span_func, print_warnings=False):
+def collect_recipes_with_annotations(annotations_paths, recipes_paths, scheme_func, map_entity_func, entities_map,
+                                     choose_span_func, print_warnings=False):
     """
-
-    :param annotations_folder: (str) path to folder with annotations
-    :param recipes_folder: (str) path to folder with recipes
+    :param annotations_paths: a path to folder with annotations, or a list of paths to annotation files
+    :param recipes_paths: a path to folder with recipes, or a list of paths to recipe files
     :param scheme_func: (func) choose if you want BIO (bio_scheme) or BILUO (biluo_scheme)
     :param map_entity_func: (func) choose if you want to map entities in according to entities_map
     :param entities_map: (dict) a dictionary for entity mappings
@@ -203,15 +203,23 @@ def collect_annotations(annotations_folder, recipes_folder, scheme_func, map_ent
     :return: all_recipes: (list) a list with recipes split to tokens
     :return: all_entities: (list) a list with entities for each token from all_recipes
     """
-    ann_files = [file for file in os.listdir(annotations_folder) if ".ann" in file]
+
+    if isinstance(annotations_paths, list):
+        ann_files = annotations_paths
+    elif isinstance(annotations_paths, str):
+        ann_files = [os.path.join(annotations_paths, file) for file in os.listdir(annotations_paths) if ".ann" in file]
+
+    if isinstance(recipes_paths, list):
+        recipe_files = recipes_paths
+    elif isinstance(recipes_paths, str):
+        recipe_files = [os.path.join(annotations_paths, re.findall(r'\d+', ann_file)[-1] + ".txt")
+                        for ann_file in ann_files]
 
     all_recipes = []
     all_entities = []
 
     print("Loading annotation files")
-    for ann_file in tqdm(ann_files, total=len(ann_files)):
-        ann_path = os.path.join(annotations_folder, ann_file)
-        recipe_path = os.path.join(recipes_folder, ann_file.replace(".ann", ".txt"))
+    for ann_path, recipe_path in tqdm(zip(ann_files, recipe_files), total=len(ann_files)):
 
         recipe_tokens, recipe_entities = process_single_annotation(ann_path, recipe_path, scheme_func,
                                                                    map_entity_func, entities_map, choose_span_func)
@@ -219,3 +227,31 @@ def collect_annotations(annotations_folder, recipes_folder, scheme_func, map_ent
         all_entities.append(recipe_entities)
 
     return all_recipes, all_entities
+
+
+def collect_recipes_without_annotations(recipes_paths):
+    """
+    :param recipes_paths: a path to folder with recipes, or a list of paths to recipe files
+    :return: all_recipes: (list) a list with recipes split to tokens
+    """
+    if isinstance(recipes_paths, list):
+        recipe_files = recipes_paths
+    elif isinstance(recipes_paths, str):
+        recipe_files = [os.path.join(recipes_paths, recipe_file) for recipe_file in recipes_paths if
+                        recipe_file.endswith(".txt")]
+
+    all_recipes = []
+
+    print("Loading recipes")
+    for recipe_path in tqdm(recipe_files, total=len(recipe_files)):
+
+        with open(recipe_path, "r") as f:
+            recipe = f.read()
+
+        doc = nlp.make_doc(recipe)
+
+        recipe_tokens = [prepare_token_text(token.text) for token in doc]
+
+        all_recipes.append(recipe_tokens)
+
+    return all_recipes
