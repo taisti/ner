@@ -4,6 +4,8 @@ So far Python 3.6.9 has been used. If you have other version, perhaps it is
 fine if you just remove versions from `requirements.txt`.
 
 TODO: dockerization or equivalent
+TODO: runner script for TaistiNer
+TODO: data_processing refactoring (more functional, less conditional)
 
 Note: Preferably unzip data from Google Drive (0.zip) to data/annotations.
 
@@ -35,18 +37,12 @@ is partly, and will be fully functional to provide flexibility. However, right
 now we need to design a full architecture to code the data preparation process
 accordingly.
 
-In src/FoodNer you can FoodNer, a BERT fine-tuned for food entities extraction.
-If you run it, you'll get predictions for our data and associated metrics.
-You can run it with, for instance, with the command below:
-```bash
-python src/FoodNer.py \
---foodner-path ./res/foodner \
---annotations-folder \
-./data/annotations \
---recipes-folder ./data/annotations
-```
+In `src/model_ner_runner.ipynb` you can see the training, evaluation and prediction.
+These relate to `res/ner_model` a first version of NERTaisti model. 
 
-See ./eda/generate_plots.py for more details.
+In `res/foodner` are FoodNer weights. Currently, these were not used.
+
+
 
 FoodNer's paper: [A Fine-Tuned Bidirectional Encoder Representations From Transformers
 Model for Food Named-Entity Recognition: Algorithm Development and
@@ -62,9 +58,10 @@ python eda/generate_plots.py \
 --show-fig True \
 --save-fig True
 ```
+See ./eda/generate_plots.py for more details.
 
 Ideas for NER models:
-* classicaly, HuggingFace and `BertForTokenClassification`
+* classically, HuggingFace and `BertForTokenClassification`
 * Nerda library, API for NER (looks very friendly!)
   * https://github.com/ebanalyse/NERDA
   * tutorial: https://towardsdatascience.com/easy-fine-tuning-of-transformers-for-named-entity-recognition-d72f2b5340e3
