@@ -4,6 +4,19 @@ from mappings import LABEL_TO_ENTITY, ENTITY_TO_LABEL
 from datasets import load_metric
 
 
+def check_if_entity_correctly_began(entity, prev_entity):
+    """
+    This function checks if "I-" entity is preceded with "B-" or "I-". For example, "I-FOOD" should not happen after "O"
+    or after "B-QUANT".
+    :param entity:
+    :param prev_entity:
+    :return: bool
+    """
+    if "I-" in entity and re.sub(r"[BI]-", "", entity) != re.sub(r"[BI]-", "", prev_entity):
+        return False
+    return True
+
+
 def token_to_entity_predictions(text_split_words, text_split_tokens, token_labels):
     """
     Transform token (subword) predictions into word predictions.
@@ -18,8 +31,8 @@ def token_to_entity_predictions(text_split_words, text_split_tokens, token_label
     word_entities = []
     word_from_tokens = ""
     word_entity = ""
+    prev_word_entity = ""
 
-    # TODO: exclude cases when there is I- without B-
     for token_label, token in zip(token_labels, text_split_tokens):
         if token in ["[SEP]", "[CLS]"]:
             continue
@@ -29,8 +42,13 @@ def token_to_entity_predictions(text_split_words, text_split_tokens, token_label
 
         if word_from_tokens == text_split_words[word_idx] or word_from_tokens == "[UNK]":
             word_idx += 1
+            # replace entities containing "I-" that do not have a predecessor with "B-"
+            # TODO: perhaps it should be replaced with the next most probable entity, not with "O". Especially there are
+            #  cases such as true: B-FOOD, I-FOOD, I-FOOD, and pred: B-FOOD, O, I-FOOD, for [confectioner, 's, sugar]
+            word_entity = "O" if not check_if_entity_correctly_began(word_entity, prev_word_entity) else word_entity
             word_entities.append(word_entity)
             word_from_tokens = ""
+            prev_word_entity = word_entity
             word_entity = ""
 
     return word_entities
