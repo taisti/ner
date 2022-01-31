@@ -61,7 +61,7 @@ def correct_span(span_start, span_end, prev_span_end, next_span_start, recipe):
     while span_start > prev_span_end and recipe[span_start-1].strip() != "":
         span_start -= 1
 
-    if recipe[span_start] in string.punctuation:
+    if recipe[span_start] in string.punctuation:  # TODO: /colored instead of color
         span_start += 1
 
     while span_end < next_span_start and recipe[span_end].strip() != "":
