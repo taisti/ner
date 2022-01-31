@@ -23,7 +23,7 @@ To freely import all scripts, please add the followings to the PYTHONPATH:
 export PYTHONPATH=$PYTHONPATH:<path-to-ner-repo-folder>/src
 ```
 
-In order to download models please check (this folder)[./res/].
+In order to download models please check [this folder](./res/).
 
 TODO: use git-lfs (may be a problem due to constraints for the free version)
 
