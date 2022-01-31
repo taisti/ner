@@ -22,7 +22,7 @@ class NERTaisti:
 
         torch.manual_seed(self.config["training_args"]["seed"])
         model = AutoModelForTokenClassification.from_pretrained(
-            model_pretrained_path, num_labels=len(ENTITY_TO_LABEL)
+            model_pretrained_path, num_labels=len(ENTITY_TO_LABEL), ignore_mismatched_sizes=True
         )
 
         training_args = TrainingArguments(
