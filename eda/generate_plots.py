@@ -7,6 +7,7 @@ import seaborn as sns
 import spacy
 
 from src.prepare_data_utils import process_ann_file
+from src.mappings import ENTITIES_MAP
 
 
 def count_entities_types(quantities_dict, entities, nlp, entity_type):
@@ -146,7 +147,7 @@ def plot_entities_examples_quantities(quantities, num_of_files, num_of_categorie
     plt.tight_layout()
 
     if save_fig:
-        fig_path = os.path.join(images_folder_path, "{entity_type}_examples_distribution.png")
+        fig_path = os.path.join(images_folder_path, f"{entity_type}_examples_distribution.png")
         plt.savefig(fig_path)
 
     if show_fig:
@@ -165,27 +166,24 @@ def main(args):
     plot_entities_quantities(quantities, num_of_files, args.num_of_categories, args.images_folder, args.save_fig,
                              args.show_fig)
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "food")
+    entity_types = ["food"] + [el for el in list(ENTITIES_MAP.keys()) if not el.startswith("food")]
+    for entity_type in entity_types:
 
-    plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, "food", args.images_folder,
-                                      args.save_fig, args.show_fig)
+        quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples,
+                                                        nlp, entity_type)
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "unit")
+        if entity_type == "quantity":
+            quantities_with_numeric = {"numeric": 0}
+            for k, v in quantities.items():
+                if bool(re.search(r'([0-9]+.[1-9][0-9]|[0-9]+)', k)):
+                    quantities_with_numeric["numeric"] += v
+                else:
+                    quantities_with_numeric[k] = v
 
-    plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, "unit", args.images_folder,
-                                      args.save_fig, args.show_fig)
+            quantities = quantities_with_numeric
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "quantity")
-
-    quantities_with_numeric = {"numeric": 0}
-    for k, v in quantities.items():
-        if bool(re.search(r'([0-9]+.[1-9][0-9]|[0-9]+)', k)):
-            quantities_with_numeric["numeric"] += v
-        else:
-            quantities_with_numeric[k] = v
-
-    plot_entities_examples_quantities(quantities_with_numeric, num_of_files, args.num_of_categories, "quantity",
-                                      args.images_folder, args.save_fig, args.show_fig)
+        plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, entity_type,
+                                          args.images_folder, args.save_fig, args.show_fig)
 
 
 if __name__ == "__main__":
