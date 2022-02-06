@@ -1,4 +1,5 @@
 import os
+import re
 import torch
 import json
 
@@ -19,21 +20,25 @@ class NERTaisti:
         if isinstance(config, str):
             with open(config, "r") as json_file:
                 self.config = json.load(json_file)
+            path_to_config_dir = os.path.dirname(config)
         elif isinstance(config, dict):
             self.config = config
+            path_to_config_dir = "."
         else:
             raise TypeError(f"{config} is not a config!")
 
-        if self.config["model_pretrained_path"] and os.path.exists(self.config["model_pretrained_path"]):
-            model_name_or_path = self.config["model_pretrained_path"]
+        possible_model_path = os.path.join(path_to_config_dir, self.config["model_pretrained_path"])
+        if self.config["model_pretrained_path"] and os.path.exists(os.path.join(possible_model_path,
+                                                                                "pytorch_model.bin")):
+            model_name_or_path = possible_model_path
             print(f"Loaded pretrained model from {os.path.abspath(model_name_or_path)}!!!")
         else:
             model_name_or_path = self.config["_name_or_path"]  # huggingface's variable name for model type
             print(f"Loaded huggingface checkpoint: {model_name_or_path}")
 
-        possible_tokenizer_path = os.path.join(self.config["model_pretrained_path"], "tokenizer_config.json")
-        if self.config["model_pretrained_path"] and os.path.exists(possible_tokenizer_path):
-            tokenizer_name_or_path = possible_tokenizer_path
+        if self.config["model_pretrained_path"] and os.path.exists(os.path.join(possible_model_path,
+                                                                                "tokenizer_config.json")):
+            tokenizer_name_or_path = possible_model_path
             print(f"Loaded tokenizer from {os.path.abspath(tokenizer_name_or_path)}!!!")
         else:
             tokenizer_name_or_path = self.config["_name_or_path"]
@@ -81,7 +86,8 @@ class NERTaisti:
 
         pred_entities = self.predict(recipes)
 
-        entities_types = list(set(list(self.trainer.model.config.label2id.keys())))
+        entities_types = list(set([re.sub(r"(B|I)-", "", entity) for entity in
+                                   self.trainer.model.config.label2id.keys()]))
         entities_types.remove("O")
 
         evaluator = Evaluator(
@@ -119,7 +125,7 @@ class NERTaisti:
             text_split_tokens = self.tokenizer.convert_ids_to_tokens(data["input_ids"][recipe_idx])
 
             pred_entities.append(token_to_entity_predictions(
-                text_split_words, text_split_tokens, token_labels[recipe_idx], self.config['id2label']
+                text_split_words, text_split_tokens, token_labels[recipe_idx], self.trainer.model.config.id2label
             ))
 
         return pred_entities
@@ -127,7 +133,7 @@ class NERTaisti:
     def prepare_data(self, recipes, entities):
         data = tokenize_and_align_labels(
             recipes=recipes, entities=entities, tokenizer=self.tokenizer,
-            label2id=self.trainer.model.config["label2id"],
+            label2id=self.trainer.model.config.label2id,
             max_length=self.config["num_of_tokens"],
             only_first_token=self.config["only_first_token"]
         )
@@ -138,15 +144,14 @@ class NERTaisti:
 
     def save_model(self):
         save_dir = self.config["save_dir"] if self.config["save_dir"] else "taisti_ner_model"
+        os.makedirs(save_dir, exist_ok=True)
 
         # Add custom config values to the config.json
         self.trainer.model.config.num_of_tokens = self.config["num_of_tokens"]
         self.trainer.model.config.only_first_token = self.config["only_first_token"]
-
-        with open(os.path.join(save_dir, "training_args.json"), "w") as json_file:
-            json.dump(self.trainer.args, json_file, indent=4)
-
-        print(f"Model with configs saved in {os.path.abspath(save_dir)}!!!")
+        self.trainer.model.config.training_args = self.config["training_args"]
+        self.trainer.model.config.model_pretrained_path = "."
 
         self.trainer.save_model(save_dir)
 
+        print(f"Model with configs saved in {os.path.abspath(save_dir)}!!!")
