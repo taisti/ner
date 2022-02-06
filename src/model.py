@@ -11,6 +11,10 @@ from nervaluate import Evaluator
 
 
 class NERTaisti:
+    """
+    It uses Huggingface's Trainer API. For more details see:
+    https://huggingface.co/docs/transformers/v4.16.2/en/custom_datasets#token-classification-with-wnut-emerging-entities
+    """
     def __init__(self, config):
 
         if isinstance(config, str):
@@ -18,18 +22,29 @@ class NERTaisti:
                 self.config = json.load(json_file)
         elif isinstance(config, dict):
             self.config = config
-
-        self.bert_type = self.config["bert_type"]
-        self.tokenizer = AutoTokenizer.from_pretrained(self.bert_type)
-
-        if not self.config.get("model_pretrained_path", ""):
-            model_pretrained_path = self.bert_type
         else:
-            model_pretrained_path = self.config["model_pretrained_path"]
+            raise TypeError(f"{config} is not a config!")
+
+        if self.config["model_pretrained_path"] and os.path.exists(self.config["model_pretrained_path"]):
+            model_name_or_path = self.config["model_pretrained_path"]
+            print(f"Loaded pretrained model from {os.path.abspath(model_name_or_path)}!!!")
+        else:
+            model_name_or_path = self.config["_name_or_path"]  # huggingface's variable name for model type
+            print(f"Loaded huggingface checkpoint: {model_name_or_path}")
+
+        possible_tokenizer_path = os.path.join(self.config["model_pretrained_path"], "tokenizer_config.json")
+        if self.config["model_pretrained_path"] and os.path.exists(possible_tokenizer_path):
+            tokenizer_name_or_path = possible_tokenizer_path
+            print(f"Loaded tokenizer from {os.path.abspath(tokenizer_name_or_path)}!!!")
+        else:
+            tokenizer_name_or_path = self.config["_name_or_path"]
+            print(f"Loaded huggingface tokenizer: {model_name_or_path}")
+
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
 
         torch.manual_seed(self.config["training_args"]["seed"])
         model = AutoModelForTokenClassification.from_pretrained(
-            model_pretrained_path, num_labels=len(ENTITY_TO_LABEL), ignore_mismatched_sizes=True
+            model_name_or_path, num_labels=len(ENTITY_TO_LABEL), ignore_mismatched_sizes=True
         )
 
         training_args = TrainingArguments(
