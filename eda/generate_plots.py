@@ -40,19 +40,15 @@ def count_entities_examples(quantities_dict, entities, nlp, entity_type):
     return quantities_dict
 
 
-def calculate_quantities(path_to_annotations_folder, count_func, nlp, entity_type):
+def calculate_quantities(ann_files_paths, count_func, nlp, entity_type):
 
     quantities = {}
 
-    files = os.listdir(path_to_annotations_folder)
-    ann_files = [file for file in files if ".ann" in file]
-
     num_of_files = 0
 
-    for ann_file in ann_files:
+    for path_to_ann_file in ann_files_paths:
 
         num_of_files += 1
-        path_to_ann_file = os.path.join(path_to_annotations_folder, ann_file)
         entities, relations = process_ann_file(path_to_ann_file)
 
         quantities = count_func(quantities, entities, nlp, entity_type)
@@ -64,7 +60,8 @@ def set_plotting_style():
     sns.set_style("whitegrid")
 
 
-def plot_entities_quantities(quantities, num_of_files, num_of_categories, images_folder_path, save_fig, show_fig):
+def plot_entities_quantities(quantities, num_of_categories, images_folder_path, fig_title, save_fig,
+                             show_fig):
 
     quantities = dict(sorted(quantities.items(), key=lambda x: x[1], reverse=True))
 
@@ -100,12 +97,12 @@ def plot_entities_quantities(quantities, num_of_files, num_of_categories, images
     for i, v in enumerate(quantities.values()):
         ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
 
-    plt.title(f"Entities quantities within {num_of_files} recipes", size=20)
+    plt.title(fig_title, size=20)
     plt.ylim(0, 1.2 * max(quantities.values()))
     plt.tight_layout()
 
     if save_fig:
-        fig_path = os.path.join(images_folder_path, "entities_types_distribution.png")
+        fig_path = os.path.join(images_folder_path, f"{fig_title}.png")
         plt.savefig(fig_path)
 
     if show_fig:
@@ -140,7 +137,8 @@ def plot_entities_examples_quantities(quantities, num_of_files, num_of_categorie
     plt.xticks(rotation=90, size=10)
 
     for i, v in enumerate(quantities.values()):
-        ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
+        ax.text(i, v + max(quantities.values())*0.005, str(v), color='blue', fontweight='bold', rotation=0,
+                ha='center', size=10)
 
     plt.title(f"{entity_type} entities quantities within {num_of_files} recipes", size=20)
     plt.ylim(0, 1.2 * max(quantities.values()))
@@ -161,15 +159,30 @@ def main(args):
 
     nlp = spacy.load("en_core_web_sm")
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_types, nlp, None)
+    all_ann_files_paths = [os.path.join(args.annotations_folder, file) for file in os.listdir(args.annotations_folder)
+                           if ".ann" in file]
+    val_ann_files_paths = [path for path in all_ann_files_paths if 240 <= int(re.findall(r'\d+', path)[0]) < 300]
+    test_ann_files_paths = [path for path in all_ann_files_paths if 400 <= int(re.findall(r'\d+', path)[0]) < 500]
+    train_ann_files_paths = [path for path in all_ann_files_paths if path not in val_ann_files_paths
+                             and path not in test_ann_files_paths]
 
-    plot_entities_quantities(quantities, num_of_files, args.num_of_categories, args.images_folder, args.save_fig,
-                             args.show_fig)
+    ann_files_paths = {
+        "all": all_ann_files_paths,
+        "train": train_ann_files_paths,
+        "val": val_ann_files_paths,
+        "test": test_ann_files_paths,
+    }
+
+    for set_type in ann_files_paths.keys():
+        quantities, num_of_files = calculate_quantities(ann_files_paths[set_type], count_entities_types, nlp, None)
+        fig_title = f"Entities quantities within {num_of_files} files - {set_type} recipes"
+        plot_entities_quantities(quantities, args.num_of_categories, args.images_folder, fig_title, args.save_fig,
+                                 args.show_fig)
 
     entity_types = ["food"] + [el for el in list(ENTITIES_MAP.keys()) if not el.startswith("food")]
     for entity_type in entity_types:
 
-        quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples,
+        quantities, num_of_files = calculate_quantities(ann_files_paths['all'], count_entities_examples,
                                                         nlp, entity_type)
 
         if entity_type == "quantity":
