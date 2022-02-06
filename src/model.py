@@ -4,7 +4,6 @@ import json
 
 from transformers import (AutoTokenizer, AutoModelForTokenClassification, DataCollatorForTokenClassification, Trainer,
                           TrainingArguments)
-from mappings import ENTITY_TO_LABEL, ENTITIES_MAP
 from utils import tokenize_and_align_labels, compute_metrics, token_to_entity_predictions
 from datasets import Dataset
 from nervaluate import Evaluator
@@ -42,9 +41,12 @@ class NERTaisti:
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
 
+        label2id = {k: int(v) for k, v in self.config["label2id"].items()}
+        id2label = {v: k for k, v in label2id.items()}
         torch.manual_seed(self.config["training_args"]["seed"])
         model = AutoModelForTokenClassification.from_pretrained(
-            model_name_or_path, num_labels=len(ENTITY_TO_LABEL), ignore_mismatched_sizes=True
+            model_name_or_path, num_labels=len(self.config["label2id"]), ignore_mismatched_sizes=True,
+            label2id=label2id, id2label=id2label
         )
 
         training_args = TrainingArguments(
@@ -79,7 +81,7 @@ class NERTaisti:
 
         pred_entities = self.predict(recipes)
 
-        entities_types = list(set(list(ENTITIES_MAP.values())))
+        entities_types = list(set(list(self.trainer.model.config.label2id.keys())))
         entities_types.remove("O")
 
         evaluator = Evaluator(
@@ -117,14 +119,16 @@ class NERTaisti:
             text_split_tokens = self.tokenizer.convert_ids_to_tokens(data["input_ids"][recipe_idx])
 
             pred_entities.append(token_to_entity_predictions(
-                text_split_words, text_split_tokens, token_labels[recipe_idx]
+                text_split_words, text_split_tokens, token_labels[recipe_idx], self.config['id2label']
             ))
 
         return pred_entities
 
     def prepare_data(self, recipes, entities):
         data = tokenize_and_align_labels(
-            recipes=recipes, entities=entities, tokenizer=self.tokenizer, max_length=self.config["max_length"],
+            recipes=recipes, entities=entities, tokenizer=self.tokenizer,
+            label2id=self.trainer.model.config["label2id"],
+            max_length=self.config["max_length"],
             only_first_token=self.config["only_first_token"]
         )
 

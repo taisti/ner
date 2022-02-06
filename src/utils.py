@@ -1,6 +1,5 @@
 import re
 import numpy as np
-from mappings import LABEL_TO_ENTITY, ENTITY_TO_LABEL
 from datasets import load_metric
 
 
@@ -17,13 +16,14 @@ def check_if_entity_correctly_began(entity, prev_entity):
     return True
 
 
-def token_to_entity_predictions(text_split_words, text_split_tokens, token_labels):
+def token_to_entity_predictions(text_split_words, text_split_tokens, token_labels, id2label):
     """
     Transform token (subword) predictions into word predictions.
     :param text_split_words: list of words from one recipe, eg. ["I", "eat", "chicken"] (the ones that go to tokenizer)
     :param text_split_tokens: list of tokens from one recipe, eg. ["I", "eat", "chic", "##ken"] (the ones that arise
     from input decoding)
     :param token_labels: list of labels associated with each token from text_split_tokens
+    :param id2label: a mapping from ids (0, 1, ...) to labels ("B-FOOD", "I-FOOD", ...)
     :return: a list of entities associated with each word from text_split_words, ie. entities extracted from a recipe
     """
 
@@ -38,7 +38,7 @@ def token_to_entity_predictions(text_split_words, text_split_tokens, token_label
             continue
         word_from_tokens += re.sub(r"^##", "", token)
         # take the entity associated with the first token (subword)
-        word_entity = LABEL_TO_ENTITY[token_label] if word_entity == "" else word_entity
+        word_entity = id2label[token_label] if word_entity == "" else word_entity
 
         if word_from_tokens == text_split_words[word_idx] or word_from_tokens == "[UNK]":
             word_idx += 1
@@ -54,13 +54,14 @@ def token_to_entity_predictions(text_split_words, text_split_tokens, token_label
     return word_entities
 
 
-def tokenize_and_align_labels(recipes, entities, tokenizer, max_length, only_first_token=True):
+def tokenize_and_align_labels(recipes, entities, tokenizer, max_length, label2id, only_first_token=True):
     """
     Prepare recipes with/without entities for TaistiNER.
     :param recipes: list of lists of words from a recipe
     :param entities: list of lists of entities from a recipe
     :param tokenizer: tokenizer
     :param max_length: maximal tokenization length
+    :param label2id: a mapping from labels ("B-FOOD", "I-FOOD", ...) to ids (0, 1, ...)
     :param only_first_token: whether to label only first subword of a word, eg. Suppose "chicken" is split into
     "chic", "##ken". Then if True, it will have [1, -100], if False [1, 1]. -100 is omitted in Pytorch
     loss function
@@ -78,9 +79,9 @@ def tokenize_and_align_labels(recipes, entities, tokenizer, max_length, only_fir
                 if word_idx is None:
                     new_label = -100
                 elif word_idx != previous_word_idx:  # Only label the first token of a given word.
-                    new_label = ENTITY_TO_LABEL[entity[word_idx]]
+                    new_label = label2id[entity[word_idx]]
                 else:
-                    new_label = -100 if only_first_token else ENTITY_TO_LABEL[entity[word_idx]]
+                    new_label = -100 if only_first_token else label2id[entity[word_idx]]
                 label_ids.append(new_label)
                 previous_word_idx = word_idx
 
@@ -95,7 +96,8 @@ def tokenize_and_align_labels(recipes, entities, tokenizer, max_length, only_fir
 metric = load_metric("seqeval")
 
 
-# TODO: these metrics are per token, not per entity, which would be preferable instead
+# TODO: these metrics are per token, not per entity, which would be preferable instead this would require overriding
+#  huggigface's methods and classes
 def compute_metrics(p):
     """
     Compute seqeval metrics for entities: precision, recall, f1-score, accuracy. These are used only during training.
@@ -105,11 +107,11 @@ def compute_metrics(p):
 
     # Remove ignored index (special tokens)
     true_predictions = [
-        [LABEL_TO_ENTITY[p] for (p, l) in zip(prediction, label) if l != -100]
+        [p for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
     true_labels = [
-        [LABEL_TO_ENTITY[l] for (p, l) in zip(prediction, label) if l != -100]
+        [l for (p, l) in zip(prediction, label) if l != -100]
         for prediction, label in zip(predictions, labels)
     ]
 
