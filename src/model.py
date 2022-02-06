@@ -13,9 +13,14 @@ from nervaluate import Evaluator
 class NERTaisti:
     def __init__(self, config):
 
-        self.config = config
+        if isinstance(config, str):
+            with open(config, "r") as json_file:
+                self.config = json.load(json_file)
+        elif isinstance(config, dict):
+            self.config = config
+
         self.bert_type = self.config["bert_type"]
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+        self.tokenizer = AutoTokenizer.from_pretrained(self.bert_type)
 
         if not self.config.get("model_pretrained_path", ""):
             model_pretrained_path = self.bert_type
