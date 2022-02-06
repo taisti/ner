@@ -1,4 +1,6 @@
+import os
 import torch
+import json
 
 from transformers import (AutoTokenizer, AutoModelForTokenClassification, DataCollatorForTokenClassification, Trainer,
                           TrainingArguments)
@@ -50,6 +52,8 @@ class NERTaisti:
         self.trainer.eval_dataset = val_dataset
 
         self.trainer.train()
+
+        self.save_model()
 
     def evaluate(self, recipes, entities):
 
@@ -107,3 +111,13 @@ class NERTaisti:
         dataset = Dataset.from_dict(data)
 
         return data, dataset
+
+    def save_model(self):
+        save_dir = self.config["save_dir"] if self.config["save_dir"] else "taisti_ner_model"
+
+        print(f"Model with configs saved in {os.path.abspath(save_dir)}!!!")
+
+        with open(os.path.join(save_dir, "training_args.json"), "w") as json_file:
+            json.dump(self.trainer.args, json_file, indent=4)
+
+        self.trainer.save_model(save_dir)
