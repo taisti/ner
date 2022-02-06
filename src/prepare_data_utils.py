@@ -87,7 +87,7 @@ def get_first_broken_span(biluo_entities):
     return broken_span_idx
 
 
-def choose_food_span(span1, span2):
+def choose_food_span(span1, span2, hierarchy):
     """
     With two overlapping entities, choose the one which is a food entity.
     """
@@ -99,7 +99,21 @@ def choose_food_span(span1, span2):
         return rd.choice([0, 1])
 
 
-def remove_overlap_entities(entities_with_spans, choose_span_func, ann_path):
+def choose_span_according_to_hierarchy(span1, span2, hierarchy):
+    """
+    With two overlapping entities, choose the one which is higher in the hierarchy (order of elements in hierarchy, the
+    first being the most important).
+    """
+
+    hierarchy_values = {entity: i for i, entity in enumerate(hierarchy)}
+
+    if hierarchy_values[span1[2]] <= hierarchy_values[span2[2]]:
+        return 0
+    else:
+        return 1
+
+
+def remove_overlap_entities(entities_with_spans, choose_span_func, ann_path, hierarchy):
     """
     Remove overlapping entities in according to choose_span_func.
     """
@@ -111,7 +125,7 @@ def remove_overlap_entities(entities_with_spans, choose_span_func, ann_path):
             print("=" * len(f"There are some overlapping entities in {ann_path}"))
             print(f"There are some overlapping entities in {ann_path}")
 
-            keep_span = choose_span_func(entities_with_spans[span_idx], entities_with_spans[span_idx + 1])
+            keep_span = choose_span_func(entities_with_spans[span_idx], entities_with_spans[span_idx + 1], hierarchy)
             if keep_span == 0:
                 print(f"Discarded: {entities_with_spans[span_idx + 1]}")
                 print(f"Chosen: {entities_with_spans[span_idx]}")
@@ -155,7 +169,8 @@ def correct_incomplete_entities(entities_with_spans, biluo_entities, recipe, doc
     return biluo_entities, entities_with_spans
 
 
-def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_func, entities_map, choose_span_func):
+def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_func, entities_map, choose_span_func,
+                              entity_hierarchy):
     entities_from_ann_file, relations_from_ann_file = process_ann_file(ann_path)
     with open(recipe_path, "r") as f:
         recipe = f.read()
@@ -166,7 +181,7 @@ def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_fun
             entities_with_spans.append((start_of_span, end_of_span, entities_from_ann_file[entity_id].type))
 
     entities_with_spans = sorted(entities_with_spans, key=lambda span: span[0])
-    entities_with_spans = remove_overlap_entities(entities_with_spans, choose_span_func, ann_path)
+    entities_with_spans = remove_overlap_entities(entities_with_spans, choose_span_func, ann_path, entity_hierarchy)
 
     doc = nlp.make_doc(recipe)
     with warnings.catch_warnings():  # ignore warning for incomplete entities, as this issue is already handled
@@ -190,7 +205,7 @@ def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_fun
 
 
 def collect_recipes_with_annotations(annotations_paths, recipes_paths, scheme_func, map_entity_func, entities_map,
-                                     choose_span_func, print_warnings=False):
+                                     choose_span_func, **kwargs):
     """
     :param annotations_paths: a path to folder with annotations, or a list of paths to annotation files
     :param recipes_paths: a path to folder with recipes, or a list of paths to recipe files
@@ -198,8 +213,9 @@ def collect_recipes_with_annotations(annotations_paths, recipes_paths, scheme_fu
     :param map_entity_func: (func) choose if you want to map entities in according to entities_map
     :param entities_map: (dict) a dictionary for entity mappings
     :param choose_span_func: (func) function that chooses one, from two overlapping entities
-    :param print_warnings: (bool) choose if to display annotation files that did not load (currently, mostly because of
-    entites overlap)
+    :param kwargs: (dict), currently supports only:
+        *  entity_hierarchy - a list indicating the importance of entities, used to choose a more important entity in
+        situations when two overlap
     :return: all_recipes: (list) a list with recipes split to tokens
     :return: all_entities: (list) a list with entities for each token from all_recipes
     """
@@ -222,7 +238,8 @@ def collect_recipes_with_annotations(annotations_paths, recipes_paths, scheme_fu
     for ann_path, recipe_path in tqdm(zip(ann_files, recipe_files), total=len(ann_files)):
 
         recipe_tokens, recipe_entities = process_single_annotation(ann_path, recipe_path, scheme_func,
-                                                                   map_entity_func, entities_map, choose_span_func)
+                                                                   map_entity_func, entities_map, choose_span_func,
+                                                                   kwargs["entity_hierarchy"])
         all_recipes.append(recipe_tokens)
         all_entities.append(recipe_entities)
 
