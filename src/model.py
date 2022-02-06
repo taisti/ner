@@ -54,7 +54,7 @@ class NERTaisti:
         )
 
         data_collator = DataCollatorForTokenClassification(
-            tokenizer=self.tokenizer, max_length=self.config["max_length"], padding="max_length"
+            tokenizer=self.tokenizer, max_length=self.config["num_of_tokens"], padding="max_length"
         )
 
         self.trainer = Trainer(
@@ -128,7 +128,7 @@ class NERTaisti:
         data = tokenize_and_align_labels(
             recipes=recipes, entities=entities, tokenizer=self.tokenizer,
             label2id=self.trainer.model.config["label2id"],
-            max_length=self.config["max_length"],
+            max_length=self.config["num_of_tokens"],
             only_first_token=self.config["only_first_token"]
         )
 
@@ -139,9 +139,14 @@ class NERTaisti:
     def save_model(self):
         save_dir = self.config["save_dir"] if self.config["save_dir"] else "taisti_ner_model"
 
-        print(f"Model with configs saved in {os.path.abspath(save_dir)}!!!")
+        # Add custom config values to the config.json
+        self.trainer.model.config.num_of_tokens = self.config["num_of_tokens"]
+        self.trainer.model.config.only_first_token = self.config["only_first_token"]
 
         with open(os.path.join(save_dir, "training_args.json"), "w") as json_file:
             json.dump(self.trainer.args, json_file, indent=4)
 
+        print(f"Model with configs saved in {os.path.abspath(save_dir)}!!!")
+
         self.trainer.save_model(save_dir)
+
