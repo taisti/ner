@@ -9,6 +9,28 @@ import spacy
 from src.prepare_data_utils import process_ann_file
 
 
+ENTITIES_MAP = {
+    "food_product_with_unit": "FOOD",
+    "food_product_without_unit_uncountable": "FOOD",
+    "food_product_whole": "FOOD",
+    "food_product_without_unit_countable": "FOOD",
+    "quantity": "QUANT",
+    "unit": "UNIT",
+    "physical_quality": "O",
+    "color": "O",
+    "trade_name": "O",
+    "purpose": "O",
+    "taste": "O",
+    "process": "O",
+    "example": "O",
+    "part": "O",
+    "diet": "O",
+    "possible_substitute": "O",
+    "excluded": "O",
+    "exclusive": "O"
+}
+
+
 def count_entities_types(quantities_dict, entities, nlp, entity_type):
 
     for entity in entities.values():
@@ -39,19 +61,15 @@ def count_entities_examples(quantities_dict, entities, nlp, entity_type):
     return quantities_dict
 
 
-def calculate_quantities(path_to_annotations_folder, count_func, nlp, entity_type):
+def calculate_quantities(ann_files_paths, count_func, nlp, entity_type):
 
     quantities = {}
 
-    files = os.listdir(path_to_annotations_folder)
-    ann_files = [file for file in files if ".ann" in file]
-
     num_of_files = 0
 
-    for ann_file in ann_files:
+    for path_to_ann_file in ann_files_paths:
 
         num_of_files += 1
-        path_to_ann_file = os.path.join(path_to_annotations_folder, ann_file)
         entities, relations = process_ann_file(path_to_ann_file)
 
         quantities = count_func(quantities, entities, nlp, entity_type)
@@ -63,9 +81,11 @@ def set_plotting_style():
     sns.set_style("whitegrid")
 
 
-def plot_entities_quantities(quantities, num_of_files, num_of_categories, images_folder_path, save_fig, show_fig):
+def plot_entities_quantities(quantities, num_of_categories, images_folder_path,
+                             fig_title, save_fig, show_fig):
 
-    quantities = dict(sorted(quantities.items(), key=lambda x: x[1], reverse=True))
+    quantities = dict(
+        sorted(quantities.items(), key=lambda x: x[1], reverse=True))
 
     other_quantity = 0
 
@@ -87,32 +107,37 @@ def plot_entities_quantities(quantities, num_of_files, num_of_categories, images
 
     # shorten labels for visualization
     for idx in range(len(entities)):
-        entities[idx] = entities[idx].replace("food product without unit uncountable",
-                                              "food product without\nunit uncountable")
-        entities[idx] = entities[idx].replace("food product with unit", "food product\nwith unit")
-        entities[idx] = entities[idx].replace("food product without unit countable",
-                                              "food product without\nunit countable")
+        entities[idx] = entities[idx].replace(
+            "food product without unit uncountable",
+            "food product without\nunit uncountable")
+        entities[idx] = entities[idx].replace("food product with unit",
+                                              "food product\nwith unit")
+        entities[idx] = entities[idx].replace(
+            "food product without unit countable",
+            "food product without\nunit countable")
 
     ax.bar(entities, quantities.values())
     plt.xticks(rotation=90, size=10)
 
     for i, v in enumerate(quantities.values()):
-        ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
+        ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0,
+                ha='center', size=10)
 
-    plt.title(f"Entities quantities within {num_of_files} recipes", size=20)
+    plt.title(fig_title, size=20)
     plt.ylim(0, 1.2 * max(quantities.values()))
     plt.tight_layout()
 
     if save_fig:
-        fig_path = os.path.join(images_folder_path, "entities_types_distribution.png")
+        fig_path = os.path.join(images_folder_path, f"{fig_title}.png")
         plt.savefig(fig_path)
 
     if show_fig:
         plt.show()
 
 
-def plot_entities_examples_quantities(quantities, num_of_files, num_of_categories, entity_type, images_folder_path,
-                                      save_fig, show_fig):
+def plot_entities_examples_quantities(
+        quantities, num_of_files, num_of_categories, entity_type,
+        images_folder_path, save_fig, show_fig):
 
     quantities = dict(sorted(quantities.items(), key=lambda x: x[1],
                              reverse=True))
@@ -139,14 +164,17 @@ def plot_entities_examples_quantities(quantities, num_of_files, num_of_categorie
     plt.xticks(rotation=90, size=10)
 
     for i, v in enumerate(quantities.values()):
-        ax.text(i, v + 10, str(v), color='blue', fontweight='bold', rotation=0, ha='center', size=10)
+        ax.text(i, v + max(quantities.values())*0.005, str(v), color='blue',
+                fontweight='bold', rotation=0, ha='center', size=10)
 
-    plt.title(f"{entity_type} entities quantities within {num_of_files} recipes", size=20)
+    plt.title(f"{entity_type} entities quantities within {num_of_files} "
+              f"recipes", size=20)
     plt.ylim(0, 1.2 * max(quantities.values()))
     plt.tight_layout()
 
     if save_fig:
-        fig_path = os.path.join(images_folder_path, "{entity_type}_examples_distribution.png")
+        fig_path = os.path.join(images_folder_path,
+                                f"{entity_type}_examples_distribution.png")
         plt.savefig(fig_path)
 
     if show_fig:
@@ -160,44 +188,71 @@ def main(args):
 
     nlp = spacy.load("en_core_web_sm")
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_types, nlp, None)
+    all_ann_files_paths = [os.path.join(args.annotations_folder, file)
+                           for file in os.listdir(args.annotations_folder)
+                           if ".ann" in file]
+    val_ann_files_paths = [path for path in all_ann_files_paths
+                           if 240 <= int(re.findall(r'\d+', path)[0]) < 300]
+    test_ann_files_paths = [path for path in all_ann_files_paths
+                            if 400 <= int(re.findall(r'\d+', path)[0]) < 500]
+    train_ann_files_paths = [path for path in all_ann_files_paths
+                             if path not in val_ann_files_paths
+                             and path not in test_ann_files_paths]
 
-    plot_entities_quantities(quantities, num_of_files, args.num_of_categories, args.images_folder, args.save_fig,
-                             args.show_fig)
+    ann_files_paths = {
+        "all": all_ann_files_paths,
+        "train": train_ann_files_paths,
+        "val": val_ann_files_paths,
+        "test": test_ann_files_paths,
+    }
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "food")
+    for set_type in ann_files_paths.keys():
+        quantities, num_of_files = calculate_quantities(
+            ann_files_paths[set_type], count_entities_types, nlp, None)
+        fig_title = f"Entities quantities within {num_of_files} " \
+                    f"files - {set_type} recipes"
+        plot_entities_quantities(quantities, args.num_of_categories,
+                                 args.images_folder, fig_title, args.save_fig,
+                                 args.show_fig)
 
-    plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, "food", args.images_folder,
-                                      args.save_fig, args.show_fig)
+    entity_types = ["food"] + [el for el in list(ENTITIES_MAP.keys())
+                               if not el.startswith("food")]
+    for entity_type in entity_types:
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "unit")
+        quantities, num_of_files = calculate_quantities(ann_files_paths['all'],
+                                                        count_entities_examples,
+                                                        nlp, entity_type)
 
-    plot_entities_examples_quantities(quantities, num_of_files, args.num_of_categories, "unit", args.images_folder,
-                                      args.save_fig, args.show_fig)
+        if entity_type == "quantity":
+            quantities_with_numeric = {"numeric": 0}
+            for k, v in quantities.items():
+                if bool(re.search(r'([0-9]+.[1-9][0-9]|[0-9]+)', k)):
+                    quantities_with_numeric["numeric"] += v
+                else:
+                    quantities_with_numeric[k] = v
 
-    quantities, num_of_files = calculate_quantities(args.annotations_folder, count_entities_examples, nlp, "quantity")
+            quantities = quantities_with_numeric
 
-    quantities_with_numeric = {"numeric": 0}
-    for k, v in quantities.items():
-        if bool(re.search(r'([0-9]+.[1-9][0-9]|[0-9]+)', k)):
-            quantities_with_numeric["numeric"] += v
-        else:
-            quantities_with_numeric[k] = v
-
-    plot_entities_examples_quantities(quantities_with_numeric, num_of_files, args.num_of_categories, "quantity",
-                                      args.images_folder, args.save_fig, args.show_fig)
+        plot_entities_examples_quantities(quantities, num_of_files,
+                                          args.num_of_categories, entity_type,
+                                          args.images_folder, args.save_fig,
+                                          args.show_fig)
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-af', '--annotations-folder', type=str, default="../data/annotations",
+    parser.add_argument('-af', '--annotations-folder', type=str,
+                        default="../data/annotations",
                         help='Path to folder with annotations')
-    parser.add_argument('-if', '--images-folder', type=str, default="./images", help='Path where images are saved')
+    parser.add_argument('-if', '--images-folder', type=str, default="./images",
+                        help='Path where images are saved')
     parser.add_argument('-noc', '--num-of-categories', type=int, required=True,
                         help='Number of categories to be included')
-    parser.add_argument('--show-fig', type=bool, default=True, help='Whether to show figs')
-    parser.add_argument('--save-fig', type=bool, default=True, help='Whether to save figs')
+    parser.add_argument('--show-fig', type=bool, default=True,
+                        help='Whether to show figs')
+    parser.add_argument('--save-fig', type=bool, default=True,
+                        help='Whether to save figs')
 
     args = parser.parse_args()
 

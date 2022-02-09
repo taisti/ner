@@ -16,7 +16,8 @@ nlp = spacy.load('en_core_web_sm')
 
 
 def process_ann_file(path_to_ann_file):
-    entities, relations, _, _ = get_entities_relations_attributes_groups(path_to_ann_file)
+    entities, relations, _, _ = get_entities_relations_attributes_groups(
+        path_to_ann_file)
     return entities, relations
 
 
@@ -45,7 +46,8 @@ def prepare_token_text(token):
     return token.replace("\n", ".")
 
 
-def prepare_token_entity(entity_token, scheme_func, entity_map_func, entities_map_dict):
+def prepare_token_entity(entity_token, scheme_func, entity_map_func,
+                         entities_map_dict):
     if entity_token == NO_ENTITY_TOKEN:
         return entity_token
     else:
@@ -56,12 +58,14 @@ def prepare_token_entity(entity_token, scheme_func, entity_map_func, entities_ma
 
 def correct_span(span_start, span_end, prev_span_end, next_span_start, recipe):
     """
-    Corrects incomplete entities from ann files. For example: cacao powde -> cacao powder
+    Corrects incomplete entities from ann files. For example:
+    cacao powde -> cacao powder
     """
     while span_start > prev_span_end and recipe[span_start-1].strip() != "":
         span_start -= 1
 
-    if recipe[span_start] in string.punctuation:  # TODO: /colored instead of color
+    # TODO: /colored instead of color
+    if recipe[span_start] in string.punctuation:
         span_start += 1
 
     while span_end < next_span_start and recipe[span_end].strip() != "":
@@ -87,7 +91,7 @@ def get_first_broken_span(biluo_entities):
     return broken_span_idx
 
 
-def choose_food_span(span1, span2):
+def choose_food_span(span1, span2, hierarchy):
     """
     With two overlapping entities, choose the one which is a food entity.
     """
@@ -99,19 +103,41 @@ def choose_food_span(span1, span2):
         return rd.choice([0, 1])
 
 
-def remove_overlap_entities(entities_with_spans, choose_span_func, ann_path):
+def choose_span_according_to_hierarchy(span1, span2, hierarchy):
+    """
+    With two overlapping entities, choose the one which is higher in the
+    hierarchy (order of elements in hierarchy, the first being the most
+    important).
+    """
+
+    hierarchy_values = {entity: i for i, entity in enumerate(hierarchy)}
+
+    if hierarchy_values[span1[2]] <= hierarchy_values[span2[2]]:
+        return 0
+    else:
+        return 1
+
+
+def remove_overlap_entities(entities_with_spans, choose_span_func, ann_path,
+                            hierarchy):
     """
     Remove overlapping entities in according to choose_span_func.
     """
     entities_with_spans = copy.deepcopy(entities_with_spans)
     span_idx = 0
     while span_idx < len(entities_with_spans) - 1:
-        if entities_with_spans[span_idx][1] > entities_with_spans[span_idx + 1][0]:  # found overlapping
+        if entities_with_spans[span_idx][1] > \
+                entities_with_spans[span_idx + 1][0]:  # found overlapping
 
-            print("=" * len(f"There are some overlapping entities in {ann_path}"))
+            print("=" * 50)
             print(f"There are some overlapping entities in {ann_path}")
 
-            keep_span = choose_span_func(entities_with_spans[span_idx], entities_with_spans[span_idx + 1])
+            keep_span = choose_span_func(
+                entities_with_spans[span_idx],
+                entities_with_spans[span_idx + 1],
+                hierarchy
+            )
+
             if keep_span == 0:
                 print(f"Discarded: {entities_with_spans[span_idx + 1]}")
                 print(f"Chosen: {entities_with_spans[span_idx]}")
@@ -127,23 +153,34 @@ def remove_overlap_entities(entities_with_spans, choose_span_func, ann_path):
     return entities_with_spans
 
 
-def correct_incomplete_entities(entities_with_spans, biluo_entities, recipe, doc):
+def correct_incomplete_entities(entities_with_spans, biluo_entities, recipe,
+                                doc):
     """
     Correct incomplete entities (INCOMPLETE_ENTITY_TOKEN in biluo_entities).
     """
     while INCOMPLETE_ENTITY_TOKEN in biluo_entities:
         first_broken_span_idx = get_first_broken_span(biluo_entities)
         broken_span = entities_with_spans[first_broken_span_idx]
-        print(f"Incomplete span: {broken_span}", recipe[broken_span[0]:broken_span[1]])
+        print(f"Incomplete span: {broken_span}",
+              recipe[broken_span[0]:broken_span[1]])
 
-        prev_span_end = entities_with_spans[first_broken_span_idx - 1][1] if first_broken_span_idx > 0 else 0
+        prev_span_end = entities_with_spans[first_broken_span_idx - 1][1]\
+            if first_broken_span_idx > 0 else 0
         next_span_start = entities_with_spans[first_broken_span_idx + 1][0] \
-            if first_broken_span_idx < len(entities_with_spans) - 1 else len(recipe)
+            if first_broken_span_idx < len(entities_with_spans) - 1\
+            else len(recipe)
 
-        corrected_span_start, corrected_span_end = correct_span(broken_span[0], broken_span[1],
-                                                                prev_span_end, next_span_start, recipe)
+        corrected_span_start, corrected_span_end = correct_span(
+            broken_span[0],
+            broken_span[1],
+            prev_span_end,
+            next_span_start,
+            recipe
+        )
 
-        entities_with_spans[first_broken_span_idx] = (corrected_span_start, corrected_span_end, broken_span[2])
+        entities_with_spans[first_broken_span_idx] = (
+            corrected_span_start, corrected_span_end, broken_span[2]
+        )
 
         print(f"Corrected span: {entities_with_spans[first_broken_span_idx]}",
               recipe[corrected_span_start:corrected_span_end])
@@ -155,7 +192,9 @@ def correct_incomplete_entities(entities_with_spans, biluo_entities, recipe, doc
     return biluo_entities, entities_with_spans
 
 
-def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_func, entities_map, choose_span_func):
+def process_single_annotation(ann_path, recipe_path, scheme_func,
+                              map_entity_func, entities_map, choose_span_func,
+                              entity_hierarchy):
     entities_from_ann_file, relations_from_ann_file = process_ann_file(ann_path)
     with open(recipe_path, "r") as f:
         recipe = f.read()
@@ -163,13 +202,22 @@ def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_fun
     entities_with_spans = []
     for entity_id in entities_from_ann_file.keys():
         for start_of_span, end_of_span in entities_from_ann_file[entity_id].span:
-            entities_with_spans.append((start_of_span, end_of_span, entities_from_ann_file[entity_id].type))
+            entities_with_spans.append((
+                start_of_span, end_of_span,
+                entities_from_ann_file[entity_id].type
+            ))
 
     entities_with_spans = sorted(entities_with_spans, key=lambda span: span[0])
-    entities_with_spans = remove_overlap_entities(entities_with_spans, choose_span_func, ann_path)
+    entities_with_spans = remove_overlap_entities(
+        entities_with_spans,
+        choose_span_func,
+        ann_path,
+        entity_hierarchy
+    )
 
     doc = nlp.make_doc(recipe)
-    with warnings.catch_warnings():  # ignore warning for incomplete entities, as this issue is already handled
+    # ignore warning for incomplete entities, as this issue is already handled
+    with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
         biluo_entities = offsets_to_biluo_tags(doc, entities_with_spans)
 
@@ -180,7 +228,8 @@ def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_fun
         biluo_entities, entities_with_spans = correct_incomplete_entities(
             entities_with_spans, biluo_entities, recipe, doc)
 
-    recipe_entities = [prepare_token_entity(entity_token, scheme_func, map_entity_func, entities_map)
+    recipe_entities = [prepare_token_entity(entity_token, scheme_func,
+                                            map_entity_func, entities_map)
                        for entity_token in biluo_entities]
     recipe_tokens = [prepare_token_text(token.text) for token in doc]
 
@@ -189,40 +238,53 @@ def process_single_annotation(ann_path, recipe_path, scheme_func, map_entity_fun
     return recipe_tokens, recipe_entities
 
 
-def collect_recipes_with_annotations(annotations_paths, recipes_paths, scheme_func, map_entity_func, entities_map,
-                                     choose_span_func, print_warnings=False):
+def collect_recipes_with_annotations(annotations_paths, recipes_paths,
+                                     scheme_func, map_entity_func, entities_map,
+                                     choose_span_func, **kwargs):
     """
-    :param annotations_paths: a path to folder with annotations, or a list of paths to annotation files
-    :param recipes_paths: a path to folder with recipes, or a list of paths to recipe files
-    :param scheme_func: (func) choose if you want BIO (bio_scheme) or BILUO (biluo_scheme)
-    :param map_entity_func: (func) choose if you want to map entities in according to entities_map
+    :param annotations_paths: a path to folder with annotations, or a list of
+    paths to annotation files
+    :param recipes_paths: a path to folder with recipes, or a list of paths to
+    recipe files
+    :param scheme_func: (func) choose if you want BIO (bio_scheme) or BILUO
+    (biluo_scheme)
+    :param map_entity_func: (func) choose if you want to map entities in
+    according to entities_map
     :param entities_map: (dict) a dictionary for entity mappings
-    :param choose_span_func: (func) function that chooses one, from two overlapping entities
-    :param print_warnings: (bool) choose if to display annotation files that did not load (currently, mostly because of
-    entites overlap)
+    :param choose_span_func: (func) function that chooses one, from two
+    overlapping entities
+    :param kwargs: (dict), currently supports only:
+        *  entity_hierarchy - a list indicating the importance of entities,
+        used to choose a more important entity in situations when two overlap
     :return: all_recipes: (list) a list with recipes split to tokens
-    :return: all_entities: (list) a list with entities for each token from all_recipes
+    :return: all_entities: (list) a list with entities for each token from
+    all_recipes
     """
 
     if isinstance(annotations_paths, list):
         ann_files = annotations_paths
     elif isinstance(annotations_paths, str):
-        ann_files = [os.path.join(annotations_paths, file) for file in os.listdir(annotations_paths) if ".ann" in file]
+        ann_files = [os.path.join(annotations_paths, file) for file in
+            os.listdir(annotations_paths) if ".ann" in file]
 
     if isinstance(recipes_paths, list):
         recipe_files = recipes_paths
     elif isinstance(recipes_paths, str):
-        recipe_files = [os.path.join(annotations_paths, re.findall(r'\d+', ann_file)[-1] + ".txt")
+        recipe_files = [os.path.join(annotations_paths,
+                                     re.findall(r'\d+', ann_file)[-1] + ".txt")
                         for ann_file in ann_files]
 
     all_recipes = []
     all_entities = []
 
     print("Loading annotation files")
-    for ann_path, recipe_path in tqdm(zip(ann_files, recipe_files), total=len(ann_files)):
+    for ann_path, recipe_path in tqdm(zip(ann_files, recipe_files),
+                                      total=len(ann_files)):
 
-        recipe_tokens, recipe_entities = process_single_annotation(ann_path, recipe_path, scheme_func,
-                                                                   map_entity_func, entities_map, choose_span_func)
+        recipe_tokens, recipe_entities = process_single_annotation(
+            ann_path, recipe_path, scheme_func, map_entity_func,
+            entities_map, choose_span_func, kwargs["entity_hierarchy"]
+        )
         all_recipes.append(recipe_tokens)
         all_entities.append(recipe_entities)
 
@@ -231,14 +293,16 @@ def collect_recipes_with_annotations(annotations_paths, recipes_paths, scheme_fu
 
 def collect_recipes_without_annotations(recipes_paths):
     """
-    :param recipes_paths: a path to folder with recipes, or a list of paths to recipe files
+    :param recipes_paths: a path to folder with recipes, or a list of paths to
+    recipe files
     :return: all_recipes: (list) a list with recipes split to tokens
     """
     if isinstance(recipes_paths, list):
         recipe_files = recipes_paths
     elif isinstance(recipes_paths, str):
-        recipe_files = [os.path.join(recipes_paths, recipe_file) for recipe_file in recipes_paths if
-                        recipe_file.endswith(".txt")]
+        recipe_files = [os.path.join(recipes_paths, recipe_file)
+                        for recipe_file in recipes_paths
+                        if recipe_file.endswith(".txt")]
 
     all_recipes = []
 
