@@ -61,10 +61,16 @@ def correct_span(span_start, span_end, prev_span_end, next_span_start, recipe):
     Corrects incomplete entities from ann files. For example:
     cacao powde -> cacao powder
     """
+
+    # TODO: /colored instead of color this is the only one problematic
+    #  example and should be held properly
+    if recipe[span_start:span_end] == "colored" and \
+            recipe[span_start-1:span_end] == "/colored":
+        return span_start-1, span_end
+
     while span_start > prev_span_end and recipe[span_start-1].strip() != "":
         span_start -= 1
 
-    # TODO: /colored instead of color
     if recipe[span_start] in string.punctuation:
         span_start += 1
 
