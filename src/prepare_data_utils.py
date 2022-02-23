@@ -297,31 +297,51 @@ def collect_recipes_with_annotations(annotations_paths, recipes_paths,
     return all_recipes, all_entities
 
 
-def collect_recipes_without_annotations(recipes_paths):
+def collect_recipes_without_annotations(recipes):
     """
-    :param recipes_paths: a path to folder with recipes, or a list of paths to
-    recipe files
-    :return: all_recipes: (list) a list with recipes split to tokens
+    :param recipes: a path to folder with recipes, a path to a recipe, a list of
+    paths to recipe files or a list of recipes
+    :return: recipes_tokens: (list) a list with recipes split to tokens
     """
-    if isinstance(recipes_paths, list):
-        recipe_files = recipes_paths
-    elif isinstance(recipes_paths, str):
-        recipe_files = [os.path.join(recipes_paths, recipe_file)
-                        for recipe_file in recipes_paths
-                        if recipe_file.endswith(".txt")]
 
-    all_recipes = []
+    list_with_recipes = []
+    if isinstance(recipes, str):
+        if os.path.isdir(recipes): # path to directory with recipes
+            recipe_paths = \
+                [os.path.join(recipes, recipe_file) for recipe_file in
+                 recipes if recipe_file.endswith(".txt")]
 
-    print("Loading recipes")
-    for recipe_path in tqdm(recipe_files, total=len(recipe_files)):
+            for recipe_path in recipe_paths:
+                with open(recipe_path, "r") as f:
+                    recipe = f.read()
+                list_with_recipes.append(recipe)
 
-        with open(recipe_path, "r") as f:
-            recipe = f.read()
+        elif os.path.isfile(recipes):  # path to recipe
+            with open(recipes, "r") as f:
+                list_with_recipes = [f.read()]
+
+        else:
+            raise FileNotFoundError(f"{recipes} is neither a path to directory"
+                                    f"nor a path to recipe!")
+
+    if isinstance(recipes, list):
+        if os.path.isfile(recipes[0]):  # list of paths to recipes
+            for recipe_path in recipes:
+                with open(recipe_path, "r") as f:
+                    recipe = f.read()
+                list_with_recipes.append(recipe)
+
+        else:  # list of recipes
+            list_with_recipes = recipes
+
+    recipes_tokens = []
+    print("Tokenizing recipes")
+    for recipe in tqdm(list_with_recipes, total=len(list_with_recipes)):
 
         doc = nlp.make_doc(recipe)
 
         recipe_tokens = [prepare_token_text(token.text) for token in doc]
 
-        all_recipes.append(recipe_tokens)
+        recipes_tokens.append(recipe_tokens)
 
-    return all_recipes
+    return recipes_tokens
