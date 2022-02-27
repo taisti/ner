@@ -32,7 +32,8 @@ is partly, and will be fully functional to provide flexibility. However, right
 now we need to design a full architecture to code the data preparation process
 accordingly.
 
-In `src/model_ner_runner.ipynb` you can see the training, evaluation and prediction.
+In `notebooks/model_ner_runner.ipynb` you can see the training, evaluation and 
+prediction.
 These relate to `res/ner_model` a first version of NERTaisti model. 
 
 You can also generate some plots, for instance, with the following command:
