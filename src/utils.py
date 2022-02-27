@@ -222,7 +222,16 @@ def bio_to_span(recipe, bio_entities):
 
 def visualize_prediction(recipes, entities, in_jupyter=False,
                          options=DISPLACY_OPTIONS):
-
+    """
+    Visualize entities within a text. This function by default (
+    in_jupyter=False) displays visualizations locally on port 5000.
+    :param recipes: list of recipes or a single recipe
+    :param entities: list of entities associated with recipe(s). Can be BIO,
+    BILUO or spans
+    :param in_jupyter: if True visualization can be displayed in Jupyter cell
+    :param options: options for visualization. These include setting
+    available entities and colors for visualizing them.
+    """
     if isinstance(recipes, str):
         recipes = [recipes]
         entities = [entities]
