@@ -1,6 +1,24 @@
 import re
 import numpy as np
 from datasets import load_metric
+import spacy
+from spacy.training import biluo_tags_to_offsets
+from spacy import displacy
+
+nlp = spacy.load('en_core_web_sm')
+
+DISPLACY_OPTIONS = {
+    "ents": ["FOOD", "UNIT", "QUANTITY", "PROCESS", "COLOR",
+             "PHYSICAL_QUALITY"],
+    "colors": {
+        "FOOD": "#dbe9f6",
+        "UNIT": "#bad6eb",
+        "QUANTITY": "#89bedc",
+        "PROCESS": "#539ecd",
+        "COLOR": "#2b7bba",
+        "PHYSICAL_QUALITY": "#0b559f"
+    }
+}
 
 
 def check_if_entity_correctly_began(entity, prev_entity):
@@ -147,3 +165,100 @@ def compute_metrics(p):
         "f1": results["overall_f1"],
         "accuracy": results["overall_accuracy"],
     }
+
+
+def bio_to_biluo(bio_entities):
+    """
+    :param bio_entities: list of BIO entities, eg. ["O", "B-FOOD", "I-FOOD",
+    "B-PROCESS"]
+    :return: list of BILUO entities, eg. ["O", "B-FOOD", "L-FOOD", "U-PROCESS"]
+    """
+    biluo_entities = []
+
+    for entity_idx in range(len(bio_entities)):
+        cur_entity = bio_entities[entity_idx]
+        next_entity = bio_entities[entity_idx + 1] if \
+            entity_idx < len(bio_entities) - 1 else ""
+
+        if cur_entity.startswith("B-"):
+            if next_entity.startswith("I-"):
+                biluo_entities.append(cur_entity)
+            else:
+                biluo_entities.append(re.sub("B-", "U-", cur_entity))
+        elif cur_entity.startswith("I-"):
+            if next_entity.startswith("I-"):
+                biluo_entities.append(cur_entity)
+            else:
+                biluo_entities.append(re.sub("I-", "L-", cur_entity))
+        else:  # O
+            biluo_entities.append(cur_entity)
+
+    return biluo_entities
+
+
+def biluo_to_span(recipe, biluo_entities):
+    """
+    :param biluo_entities: list of BILUO entities, eg. ["O", "B-FOOD", "L-FOOD",
+    "U-PROCESS"]
+    :return: list of span entities, eg. [(span_start, span_end, "FOOD"),
+    (span_start, span_end, "PROCESS")]
+    """
+    doc = nlp(recipe)
+    spans = biluo_tags_to_offsets(doc, biluo_entities)
+    return spans
+
+
+def bio_to_span(recipe, bio_entities):
+    """
+    :param bio_entities: list of BIO entities, eg. ["O", "B-FOOD", "I-FOOD",
+    "B-PROCESS"]
+    :return: list of span entities, eg. [(span_start, span_end, "FOOD"),
+    (span_start, span_end, "PROCESS")]
+    """
+    biluo_entities = bio_to_biluo(bio_entities)
+    spans = biluo_to_span(recipe, biluo_entities)
+    return spans
+
+
+def visualize_prediction(recipes, entities, in_jupyter=False,
+                         options=DISPLACY_OPTIONS):
+    """
+    Visualize entities within a text. This function by default (
+    in_jupyter=False) displays visualizations locally on port 5000.
+    :param recipes: list of recipes or a single recipe
+    :param entities: list of entities associated with recipe(s). Can be BIO,
+    BILUO or spans
+    :param in_jupyter: if True visualization can be displayed in Jupyter cell
+    :param options: options for visualization. These include setting
+    available entities and colors for visualizing them.
+    """
+    if isinstance(recipes, str):
+        recipes = [recipes]
+        entities = [entities]
+
+    if isinstance(entities[0][0], str):
+        if any([bool(re.match(r"[UL]-", entity)) for entity in
+                set(entities[0])]):  # entities are in BILUO schema
+            spans = [biluo_to_span(recipe, ents) for recipe, ents in
+                     zip(recipes, entities)]
+        else:  # entities are in BIO schema
+            spans = [bio_to_span(recipe, ents) for recipe, ents in
+                     zip(recipes, entities)]
+    else:  # spans
+        spans = entities
+
+    docs = []
+    for recipe, recipe_spans in zip(recipes, spans):
+        doc = nlp(recipe)
+        ents = []
+        for span_start, span_end, label in recipe_spans:
+            ent = doc.char_span(span_start, span_end, label=label)
+            ents.append(ent)
+
+        doc.ents = ents
+        docs.append(doc)
+
+    if in_jupyter:
+        displacy.render(docs, style="ent", jupyter=True, options=options)
+    else:
+        displacy.serve(docs, style="ent", options=options)
