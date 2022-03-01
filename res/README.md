@@ -1,7 +1,7 @@
 Download the model and its config (optionally tokenizer configs) from Google Drive and put them into the ner_model folder. This model was trained on all 599 recipes. Previously, hyperparameters were chosen on a 5-fold Cross-Validation.
 
 Currently available models are:
-1. one using bert-base-cased checkpoint. It is available [here](https://drive.google.com/drive/folders/1-9sQ9AG76WQR0GRDEvMzDW8IAlDH545s?usp=sharing).
+1. one using bert-base-cased checkpoint. It is available [here](https://drive.google.com/drive/folders/1-1bgzKu4-8DRf2sSmKEDS90E01kwBnSo?usp=sharing).
 
   | Entity | Precision | Recall | F1-score |
   | :----------: | :----------: | :----------: | :----------: |
