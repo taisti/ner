@@ -348,6 +348,4 @@ def collect_recipes_without_annotations(recipes):
 
 def prepare_text(text):
     doc = nlp.make_doc(text)
-
-    tokens = [prepare_token_text(token.text) for token in doc]
-    return tokens
+    return doc
