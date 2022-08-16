@@ -15,3 +15,5 @@ spacy-loggers==1.0.3
 tokenizers==0.12.1
 torch==1.12.1
 transformers==4.21.1
+seqeval
+mendelai-brat-parser==0.0.4 
